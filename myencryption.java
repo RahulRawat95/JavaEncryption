@@ -20,6 +20,13 @@ import javax.crypto.spec.PBEKeySpec ;
 import javax.crypto.SecretKeyFactory ;
 import javax.crypto.spec.SecretKeySpec ;
 
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey ;
+import java.security.PublicKey ;
+import java.lang.Exception ;
+import java.security.Key ;
+import java.security.KeyPair ;
+
 import java.util.Base64 ;
 
 
@@ -105,8 +112,81 @@ public class myencryption {
         public static int SALT_LENGTH = 128 ;
         public static int DERIVED_KEY_LENGTH = 32 ;
 
-        public static void main(String args[]) {
+        public static byte[] computePBKDF(char[] password) throws GeneralSecurityException {
+                byte[] salt = new byte[SALT_LENGTH] ;
+                
+                SecureRandom secRandom = new SecureRandom() ;
+                secRandom.nextBytes(salt) ;
 
+                PBEKeySpec keySpec = null ;
+                try { 
+                    keySpec = new PBEKeySpec(password, salt, ITERATION_COUNT , DERIVED_KEY_LENGTH * 8);
+                } catch(NullPointerException nullPointerExc){throw new GeneralSecurityException("Salt " + salt + "is null") ;}  
+                 catch(IllegalArgumentException illegalArgumentExc){throw new GeneralSecurityException("One of the argument is illegal. Salt " + salt + " is of 0 length, iteration count " + ITERATION_COUNT + " is not positive or derived key length " + DERIVED_KEY_LENGTH + " is not positive." ) ;}  
+
+                SecretKeyFactory pbkdfKeyFactory = null ;
+
+                try { 
+                    pbkdfKeyFactory = SecretKeyFactory.getInstance(PDKDF_ALGORITHM) ;
+                } catch(NullPointerException nullPointExc) {throw new GeneralSecurityException("Specified algorithm " + PDKDF_ALGORITHM  + "is null") ;} 
+                 catch(NoSuchAlgorithmException noSuchAlgoExc) {throw new GeneralSecurityException("Specified algorithm " + PDKDF_ALGORITHM + "is not available by the provider " + pbkdfKeyFactory.getProvider().getName()) ;} 
+      
+                byte[] pbkdfHashedArray = null ; 
+                try {  
+                    pbkdfHashedArray = pbkdfKeyFactory.generateSecret(keySpec).getEncoded() ; 
+                } catch(InvalidKeySpecException invalidKeyExc) {throw new GeneralSecurityException("Specified key specification is inappropriate") ; } 
+               
+                return pbkdfHashedArray ; 
+        }
+		
+		static int RSA_KEY_LENGTH = 4096;
+        static String ALGORITHM_NAME = "RSA" ;
+        static String PADDING_SCHEME = "OAEPWITHSHA-512ANDMGF1PADDING" ;
+        static String MODE_OF_OPERATION = "ECB" ; // This essentially means none behind the scene
+		
+		public static String rsaEncrypt(String message, Key publicKey) throws Exception {
+        
+                Cipher c = Cipher.getInstance(ALGORITHM_NAME + "/" + MODE_OF_OPERATION + "/" + PADDING_SCHEME) ;
+
+                c.init(Cipher.ENCRYPT_MODE, publicKey) ;
+
+                byte[] cipherTextArray = c.doFinal(message.getBytes()) ;
+
+                return Base64.getEncoder().encodeToString(cipherTextArray) ;
+                
+        }
+
+
+        public static String rsaDecrypt(byte[] encryptedMessage, Key privateKey) throws Exception {
+                Cipher c = Cipher.getInstance(ALGORITHM_NAME + "/" + MODE_OF_OPERATION + "/" + PADDING_SCHEME) ;
+                c.init(Cipher.DECRYPT_MODE, privateKey);
+                byte[] plainText = c.doFinal(encryptedMessage);
+
+                return new String(plainText) ;
+
+        }
+		
+		public static void main(String args[]) {
+
+				String shortMessage = args[1] ;
+
+                try {
+
+                // Generate Key Pairs
+                KeyPairGenerator rsaKeyGen = KeyPairGenerator.getInstance(ALGORITHM_NAME) ;
+                rsaKeyGen.initialize(RSA_KEY_LENGTH) ;
+                KeyPair rsaKeyPair = rsaKeyGen.generateKeyPair() ;
+
+
+                    String encryptedText = rsaEncrypt(shortMessage, rsaKeyPair.getPublic());
+
+                    String decryptedText = rsaDecrypt(Base64.getDecoder().decode(encryptedText), rsaKeyPair.getPrivate()) ;
+
+                    System.out.println("Encrypted text = " + encryptedText) ;
+                    System.out.println("Decrypted text = " + decryptedText) ;
+
+                } catch(Exception e) {System.out.println("Exception while encryption/decryption") ;e.printStackTrace() ; } 
+		
                 // Strings are immutatable, so there is no way to change/nullify/modify its content after use. So always, collect and store security sensitive information in a char array instead. 
                 char[] PASSWORD = args[0].toCharArray() ; 
 
@@ -150,32 +230,5 @@ public class myencryption {
 
                 // Make sure not to repeat Key + IV pair, for encrypting more than one plaintext.
                 secRandom.nextBytes(iv);
-        }
-
-        public static byte[] computePBKDF(char[] password) throws GeneralSecurityException {
-                byte[] salt = new byte[SALT_LENGTH] ;
-                
-                SecureRandom secRandom = new SecureRandom() ;
-                secRandom.nextBytes(salt) ;
-
-                PBEKeySpec keySpec = null ;
-                try { 
-                    keySpec = new PBEKeySpec(password, salt, ITERATION_COUNT , DERIVED_KEY_LENGTH * 8);
-                } catch(NullPointerException nullPointerExc){throw new GeneralSecurityException("Salt " + salt + "is null") ;}  
-                 catch(IllegalArgumentException illegalArgumentExc){throw new GeneralSecurityException("One of the argument is illegal. Salt " + salt + " is of 0 length, iteration count " + ITERATION_COUNT + " is not positive or derived key length " + DERIVED_KEY_LENGTH + " is not positive." ) ;}  
-
-                SecretKeyFactory pbkdfKeyFactory = null ;
-
-                try { 
-                    pbkdfKeyFactory = SecretKeyFactory.getInstance(PDKDF_ALGORITHM) ;
-                } catch(NullPointerException nullPointExc) {throw new GeneralSecurityException("Specified algorithm " + PDKDF_ALGORITHM  + "is null") ;} 
-                 catch(NoSuchAlgorithmException noSuchAlgoExc) {throw new GeneralSecurityException("Specified algorithm " + PDKDF_ALGORITHM + "is not available by the provider " + pbkdfKeyFactory.getProvider().getName()) ;} 
-      
-                byte[] pbkdfHashedArray = null ; 
-                try {  
-                    pbkdfHashedArray = pbkdfKeyFactory.generateSecret(keySpec).getEncoded() ; 
-                } catch(InvalidKeySpecException invalidKeyExc) {throw new GeneralSecurityException("Specified key specification is inappropriate") ; } 
-               
-                return pbkdfHashedArray ; 
         }
 }
