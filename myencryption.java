@@ -166,6 +166,17 @@ public class myencryption {
 
         }
 		
+		public static String get(){
+			RSAPublicKey publicKey = (RSAPublicKey)kp.getPublic();
+			return publicKey.getModulus().toString() + "|" + publicKey.getPublicExponent().toString();
+		}
+		
+		public static RSAPublicKeySpec get(){
+			String []Parts = MyKeyString.split("\\|");
+			RSAPublicKeySpec Spec = new RSAPublicKeySpec(new BigInteger(Parts[0]),new BigInteger(Parts[1]));
+			return KeyFactory.getInstance("RSA").generatePublic(Spec);
+		}
+		
 		public static void main(String args[]) {
 
 				String shortMessage = args[1] ;
